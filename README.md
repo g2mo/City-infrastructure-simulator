@@ -11,6 +11,16 @@ This project generates city layouts with the following features:
 - **Industrial zones** - Located outside the city (2 or 4 zones depending on size)
 - **District centers** - Service hubs distributed throughout each ring
 
+## City Size Rules
+
+- **1-4 km radius**: 1 ring, 2 industrial zones
+- **5-9 km radius**: 2 rings, 2 industrial zones  
+- **10-15 km radius**: 3 rings, 4 industrial zones
+
+Larger cities have more district centers per ring.
+
+<img width="990" height="590" alt="city_size_comparison" src="https://github.com/user-attachments/assets/c5b0fcc9-d854-46bb-939f-1c403964327c" />
+
 ## Requirements
 
 - Python 3.6+
@@ -49,11 +59,3 @@ This creates 75 city visualizations (5 variations for each radius from 1-15 km) 
 - `config.py` - Configuration parameters for city generation
 - `main.py` - Single city generation entry point
 - `generate_city_samples.py` - Batch city generation with matplotlib
-
-## City Size Rules
-
-- **1-4 km radius**: 1 ring, 2 industrial zones
-- **5-9 km radius**: 2 rings, 2 industrial zones  
-- **10-15 km radius**: 3 rings, 4 industrial zones
-
-Larger cities have more district centers per ring.
