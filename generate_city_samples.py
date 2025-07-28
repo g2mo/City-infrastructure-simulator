@@ -37,14 +37,6 @@ def plot_city_layout(ax, city, title):
                         edgecolor=colors[i % len(colors)])
         ax.add_patch(annulus)
 
-        # Plot district centers
-        if ring.district_centers:
-            x_coords = [c.x for c in ring.district_centers]
-            y_coords = [c.y for c in ring.district_centers]
-            ax.scatter(x_coords, y_coords, color=colors[i % len(colors)],
-                       s=50, edgecolor='black', linewidth=1, zorder=5,
-                       label=f'Ring {ring.ring_number} Centers')
-
     # Plot outskirts
     outskirts = Wedge((0, 0), city.outskirts_outer_radius, 0, 360,
                       width=city.outskirts_outer_radius - city.outskirts_inner_radius,
@@ -58,6 +50,31 @@ def plot_city_layout(ax, city, title):
         ax.add_patch(ind_circle)
         ax.text(zone.x, zone.y, zone.direction, ha='center', va='center',
                 fontweight='bold', fontsize=8)
+
+    # Plot buildings if they exist
+    if hasattr(city, 'buildings') and city.buildings:
+        building_colors = {
+            'apartment': '#4169E1',
+            'house': '#32CD32',
+            'office': '#FF8C00',
+            'commercial': '#DC143C',
+            'factory': '#8B4513'
+        }
+
+        for b_type, color in building_colors.items():
+            buildings = city.get_buildings_by_type(b_type)
+            if buildings:
+                x_coords = [b.x for b in buildings]
+                y_coords = [b.y for b in buildings]
+                ax.scatter(x_coords, y_coords, color=color, s=1, alpha=0.6, label=b_type)
+
+    # Plot district centers
+    for ring in city.rings:
+        if ring.district_centers:
+            x_coords = [c.x for c in ring.district_centers]
+            y_coords = [c.y for c in ring.district_centers]
+            ax.scatter(x_coords, y_coords, color='red',
+                       s=30, marker='*', edgecolor='black', linewidth=0.5, zorder=10)
 
     # Set limits
     bounds = city.get_bounds()
@@ -80,21 +97,25 @@ def generate_single_city_plot(radius, iteration, output_dir):
     # Create figure
     fig, ax = plt.subplots(figsize=(8, 8))
 
-    # Generate city
+    # Generate city with buildings
+    from core import BuildingGenerator
     generator = LayoutGenerator(radius)
     city = generator.generate()
+
+    # Generate buildings
+    building_gen = BuildingGenerator(city)
+    building_gen.generate()
 
     # Plot city
     plot_city_layout(ax, city,
                      f'City Radius: {radius} km - Instance {iteration + 1}\n'
-                     f'Historical Center: {city.historical_center_radius:.2f} km | '
-                     f'Rings: {len(city.rings)} | '
+                     f'Buildings: {len(city.buildings)} | '
                      f'Centers: {len(city.get_all_district_centers())}')
 
     # Save
     filename = f'city_r{radius:02d}_v{iteration + 1}.png'
     filepath = output_dir / filename
-    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.savefig(filepath, dpi=150, bbox_inches='tight')
     plt.close()
 
     return city
@@ -120,7 +141,7 @@ def create_summary_grid(radius, cities, output_dir):
     # Save summary
     filename = f'city_r{radius:02d}_summary.png'
     filepath = output_dir / filename
-    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.savefig(filepath, dpi=150, bbox_inches='tight')
     plt.close()
 
 
@@ -143,7 +164,7 @@ def create_size_comparison():
     # Save
     output_dir = Path('city_visualizations')
     filepath = output_dir / 'city_size_comparison.png'
-    plt.savefig(filepath, dpi=500, bbox_inches='tight')
+    plt.savefig(filepath, dpi=200, bbox_inches='tight')
     plt.close()
 
 
@@ -276,7 +297,7 @@ def create_statistics_summary(city_sizes, cities_per_radius, output_dir):
 
     # Save
     filepath = output_dir / 'statistics_summary.png'
-    plt.savefig(filepath, dpi=300, bbox_inches='tight')
+    plt.savefig(filepath, dpi=150, bbox_inches='tight')
     plt.close()
 
 
