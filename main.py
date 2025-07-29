@@ -3,7 +3,7 @@ Main entry point for city layout generation
 Updated to include building generation
 
 Author: Guglielmo Cimolai
-Date: 28/07/2025
+Date: 29/07/2025
 """
 
 import argparse
