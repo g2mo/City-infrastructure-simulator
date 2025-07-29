@@ -10,7 +10,7 @@ import matplotlib.patches as mpatches
 from pathlib import Path
 import os
 
-from core import LayoutGenerator
+from core import LayoutGenerator, BuildingGenerator
 
 
 def plot_city_layout(ax, city, title):
