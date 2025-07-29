@@ -1,10 +1,10 @@
 """
 City module - defines the city structure
-Updated to include buildings as graph nodes
+Updated to include buildings as graph nodes and district types
 """
 
 from dataclasses import dataclass, field
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 import math
 import networkx as nx
 
@@ -17,6 +17,8 @@ class Building:
     y: float  # Position in km
     building_type: str  # 'apartment', 'house', 'office', 'commercial', 'factory'
     zone: str  # Which zone the building is in
+    primary_district: int = -1  # ID of primary influencing district
+    district_influences: Dict[int, float] = field(default_factory=dict)  # District ID -> influence strength
 
     def distance_to(self, other: 'Building') -> float:
         """Calculate distance to another building in km"""
@@ -26,14 +28,20 @@ class Building:
 @dataclass
 class DistrictCenter:
     """Represents a district center point"""
+    id: int  # Unique district ID
     x: float
     y: float
     ring: int  # Which ring this center belongs to (0 = historical center)
     angle: float  # Angle in radians from east
+    district_type: str  # 'residential', 'commercial', 'mixed'
 
     def distance_to(self, other: 'DistrictCenter') -> float:
         """Calculate distance to another district center"""
         return math.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
+
+    def distance_to_point(self, x: float, y: float) -> float:
+        """Calculate distance to a point"""
+        return math.sqrt((self.x - x) ** 2 + (self.y - y) ** 2)
 
 
 @dataclass
@@ -59,10 +67,11 @@ class City:
     """Represents the city with its layout structure and buildings"""
     radius: float  # City radius in km
     historical_center_radius: float
-    rings: List[Ring]
-    outskirts_inner_radius: float
-    outskirts_outer_radius: float
-    industrial_zones: List[IndustrialZone]
+    rings: List[Ring] = field(default_factory=list)
+    outskirts_inner_radius: float = 0.0
+    outskirts_outer_radius: float = 0.0
+    industrial_zones: List[IndustrialZone] = field(default_factory=list)
+    historical_center_district: Optional[DistrictCenter] = None  # Special district for historical center
     district_centers: List[DistrictCenter] = field(default_factory=list)
     buildings: List[Building] = field(default_factory=list)
     building_graph: nx.Graph = field(default_factory=nx.Graph)
@@ -80,7 +89,8 @@ class City:
             building.id,
             pos=(building.x, building.y),
             type=building.building_type,
-            zone=building.zone
+            zone=building.zone,
+            primary_district=building.primary_district
         )
 
     def get_zone_at_position(self, x: float, y: float) -> str:
@@ -119,11 +129,20 @@ class City:
             return 3
 
     def get_all_district_centers(self) -> List[DistrictCenter]:
-        """Get all district centers from all rings"""
+        """Get all district centers from all rings plus historical center"""
         centers = []
+        if self.historical_center_district:
+            centers.append(self.historical_center_district)
         for ring in self.rings:
             centers.extend(ring.district_centers)
         return centers
+
+    def get_district_by_id(self, district_id: int) -> Optional[DistrictCenter]:
+        """Get a district center by its ID"""
+        for district in self.get_all_district_centers():
+            if district.id == district_id:
+                return district
+        return None
 
     def get_bounds(self) -> Tuple[float, float, float, float]:
         """Get the bounding box of the city including industrial zones"""
@@ -142,6 +161,12 @@ class City:
         for b_type in ['apartment', 'house', 'office', 'commercial', 'factory']:
             building_stats[b_type] = len(self.get_buildings_by_type(b_type))
 
+        district_stats = {}
+        for district in self.get_all_district_centers():
+            if district.district_type not in district_stats:
+                district_stats[district.district_type] = 0
+            district_stats[district.district_type] += 1
+
         return {
             'radius': self.radius,
             'historical_center_radius': self.historical_center_radius,
@@ -150,6 +175,7 @@ class City:
             'num_industrial_zones': len(self.industrial_zones),
             'num_buildings': len(self.buildings),
             'building_stats': building_stats,
+            'district_stats': district_stats,
             'rings': [
                 {
                     'ring_number': ring.ring_number,
