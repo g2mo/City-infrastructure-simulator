@@ -1,6 +1,6 @@
 """
 Configuration file for City Layout Framework
-Simplified for sequential boundary generation
+Enhanced with district type system
 """
 
 # City size parameters
@@ -24,7 +24,7 @@ RING_SYSTEM = {
 # Industrial zones parameters
 INDUSTRIAL_ZONES = {
     'distance_fraction': 1.20,  # 120% of city radius
-    'radius_fraction': 0.09,  # 9% of city radius
+    'radius_fraction': 0.1,  # 10% of city radius
     'threshold_radius': 7.5,  # km - threshold for 2 vs 4 zones
 }
 
@@ -33,6 +33,62 @@ DISTRICT_CENTERS = {
     'ring_1': {'min': 6, 'max': 10},
     'ring_2': {'min': 8, 'max': 14},
     'ring_3': {'min': 10, 'max': 18},
+}
+
+# District type distribution by ring
+DISTRICT_TYPE_DISTRIBUTION = {
+    'ring_1': {
+        'residential': 0.2,
+        'commercial': 0.6,
+        'mixed': 0.2
+    },
+    'ring_2': {
+        'residential': 0.3,
+        'commercial': 0.3,
+        'mixed': 0.4
+    },
+    'ring_3': {
+        'residential': 0.6,
+        'commercial': 0.2,
+        'mixed': 0.2
+    }
+}
+
+# Building probabilities by district type
+DISTRICT_BUILDING_PROBABILITIES = {
+    'residential': {
+        'apartment': 0.60,
+        'house': 0.20,
+        'office': 0.05,
+        'commercial': 0.15,
+        'factory': 0.0
+    },
+    'commercial': {
+        'apartment': 0.10,
+        'house': 0.0,
+        'office': 0.40,
+        'commercial': 0.50,
+        'factory': 0.0
+    },
+    'mixed': {
+        'apartment': 0.35,
+        'house': 0.10,
+        'office': 0.25,
+        'commercial': 0.30,
+        'factory': 0.0
+    }
+}
+
+# District influence strength by zone (how much districts override zone probabilities)
+DISTRICT_INFLUENCE_STRENGTH = {
+    'historical_center': 0.0,  # 0% district, 100% zone
+    'ring_1': 0.4,  # 40% district, 60% zone
+    'ring_2': 0.6,  # 60% district, 40% zone
+    'ring_3': 0.8,  # 80% district, 20% zone
+    'outskirts': 0.5,  # 50% district, 50% zone
+    'industrial': 0.0,  # 0% district, 100% zone
+    'outside': 0.5,  # 50% district, 50% zone
+    'default': 0.5  # Default if zone not found
 }
 
 # Layout generation parameters
@@ -44,8 +100,9 @@ LAYOUT_PARAMS = {
 # Building generation parameters
 BUILDING_GENERATION = {
     'center_density': 100,  # buildings per km² at city center
-    'district_attractor_sigma': 0.1,  # sigma for district attractors (as fraction of city radius)
-    'district_attractor_strength': 1.0,  # strength of district attractor boost (0.3 = 30% boost)
+    'district_attractor_sigma': 0.05,  # sigma for district attractors (as fraction of city radius)
+    'district_attractor_strength': 0.3,  # strength of district attractor boost (0.3 = 30% boost)
+    'district_influence_sigma': 0.1,  # sigma for district influence on building types
 
     # Building type probabilities by zone
     'zone_probabilities': {
@@ -65,9 +122,9 @@ BUILDING_GENERATION = {
         },
         'ring_2': {  # Middle ring
             'apartment': 0.45,
-            'house': 0.05,
+            'house': 0.0,
             'office': 0.20,
-            'commercial': 0.30,
+            'commercial': 0.35,
             'factory': 0.0
         },
         'ring_3': {  # Outer ring
@@ -110,6 +167,13 @@ BUILDING_COLORS = {
     'factory': '#8B4513'  # Saddle Brown
 }
 
+# District colors by type
+DISTRICT_COLORS = {
+    'residential': '#228B22',  # Forest Green
+    'commercial': '#4B0082',  # Indigo
+    'mixed': '#FF1493'  # Deep Pink
+}
+
 # Visualization parameters
 VISUALIZATION = {
     'colors': {
@@ -123,8 +187,8 @@ VISUALIZATION = {
         'district_center': 'red',
     },
     'sizes': {
-        'district_center': 8,
+        'district_center': 12,
         'industrial_center': 10,
-        'building': 3,  # Size for building dots
+        'building': 3,
     }
 }
