@@ -1,5 +1,6 @@
 """
 Building generation module - creates buildings based on gaussian density
+Updated to include district type influences
 """
 
 import math
@@ -9,7 +10,12 @@ from typing import List, Tuple, Dict
 from dataclasses import dataclass
 
 from core.city import City, Building
-from config import BUILDING_GENERATION, BUILDING_COLORS
+from config import (
+    BUILDING_GENERATION,
+    BUILDING_COLORS,
+    DISTRICT_BUILDING_PROBABILITIES,
+    DISTRICT_INFLUENCE_STRENGTH
+)
 
 
 class BuildingGenerator:
@@ -38,15 +44,27 @@ class BuildingGenerator:
         # Assign building types and create buildings
         for x, y in positions:
             zone = self.city.get_zone_at_position(x, y)
-            building_type = self._select_building_type(zone)
+
+            # Calculate district influences
+            district_influences = self._calculate_district_influences(x, y)
+
+            # Select building type based on zone and district influences
+            building_type = self._select_building_type(zone, district_influences)
 
             if building_type:  # Only create if valid type for zone
+                # Find primary district (strongest influence)
+                primary_district = -1
+                if district_influences:
+                    primary_district = max(district_influences.items(), key=lambda x: x[1])[0]
+
                 building = Building(
                     id=self.next_building_id,
                     x=x,
                     y=y,
                     building_type=building_type,
-                    zone=zone
+                    zone=zone,
+                    primary_district=primary_district,
+                    district_influences=district_influences
                 )
                 self.city.add_building(building)
                 self.next_building_id += 1
@@ -124,6 +142,28 @@ class BuildingGenerator:
 
         return total_density
 
+    def _calculate_district_influences(self, x: float, y: float) -> Dict[int, float]:
+        """Calculate influence of each district at a position"""
+        influences = {}
+
+        for district in self.city.get_all_district_centers():
+            distance = district.distance_to_point(x, y)
+
+            # Gaussian influence with district-specific sigma
+            sigma = BUILDING_GENERATION['district_influence_sigma'] * self.city.radius
+            influence = math.exp(-(distance ** 2) / (2 * sigma ** 2))
+
+            # Only store significant influences
+            if influence > 0.01:
+                influences[district.id] = influence
+
+        # Normalize influences to sum to 1
+        total = sum(influences.values())
+        if total > 0:
+            influences = {k: v / total for k, v in influences.items()}
+
+        return influences
+
     def _check_minimum_distance(self, x: float, y: float,
                                 occupied: List[Tuple[float, float]]) -> bool:
         """Check if position maintains minimum distance from other buildings"""
@@ -133,12 +173,57 @@ class BuildingGenerator:
                 return False
         return True
 
-    def _select_building_type(self, zone: str) -> str:
-        """Select building type based on zone probabilities"""
+    def _select_building_type(self, zone: str, district_influences: Dict[int, float]) -> str:
+        """Select building type based on zone and district influences"""
+        # Get base zone probabilities
         if zone not in self.zone_probabilities:
             return None
 
-        probabilities = self.zone_probabilities[zone]
+        zone_probs = self.zone_probabilities[zone].copy()
+
+        # If no district influences, use zone probabilities
+        if not district_influences:
+            return self._sample_from_probabilities(zone_probs)
+
+        # Calculate blended probabilities based on district influences
+        blended_probs = {}
+
+        for building_type in ['apartment', 'house', 'office', 'commercial', 'factory']:
+            # Start with zone probability
+            zone_prob = zone_probs.get(building_type, 0)
+
+            # Calculate district-influenced probability
+            district_prob = 0
+            for district_id, influence in district_influences.items():
+                district = self.city.get_district_by_id(district_id)
+                if district:
+                    # Get district type probabilities
+                    district_type_probs = DISTRICT_BUILDING_PROBABILITIES.get(
+                        district.district_type, {}
+                    )
+                    district_prob += influence * district_type_probs.get(building_type, 0)
+
+            # Get influence strength for this zone
+            strength_key = f"{zone}"
+            if strength_key not in DISTRICT_INFLUENCE_STRENGTH:
+                # Try to find a matching ring
+                if zone.startswith('ring_'):
+                    strength_key = zone
+                else:
+                    strength_key = 'default'
+
+            influence_strength = DISTRICT_INFLUENCE_STRENGTH.get(strength_key, 0.5)
+
+            # Blend zone and district probabilities
+            blended_probs[building_type] = (
+                    (1 - influence_strength) * zone_prob +
+                    influence_strength * district_prob
+            )
+
+        return self._sample_from_probabilities(blended_probs)
+
+    def _sample_from_probabilities(self, probabilities: Dict[str, float]) -> str:
+        """Sample a building type from probability distribution"""
         if not probabilities:
             return None
 
