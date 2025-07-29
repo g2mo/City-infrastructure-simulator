@@ -1,6 +1,6 @@
 """
 Layout generation module - creates city layout based on rules
-Updated to ensure seamless transitions between zones without gaps or overlaps
+Updated to assign district types
 """
 
 import math
@@ -10,7 +10,7 @@ from typing import List, Tuple
 from core.city import City, Ring, DistrictCenter, IndustrialZone
 from config import (
     HISTORICAL_CENTER, RING_SYSTEM, INDUSTRIAL_ZONES,
-    DISTRICT_CENTERS, LAYOUT_PARAMS
+    DISTRICT_CENTERS, LAYOUT_PARAMS, DISTRICT_TYPE_DISTRIBUTION
 )
 
 
@@ -22,6 +22,7 @@ class LayoutGenerator:
         self.city_radius = city_radius
         self.buffer_distance = city_radius * LAYOUT_PARAMS['boundary_buffer_fraction']
         self.min_center_distance = city_radius * LAYOUT_PARAMS['min_center_distance_fraction']
+        self.next_district_id = 0
 
     def generate(self) -> City:
         """Generate complete city layout with seamless zone transitions"""
@@ -56,7 +57,19 @@ class LayoutGenerator:
             industrial_zones=industrial_zones
         )
 
-        # Generate district centers for each ring
+        # Create historical center district (always mixed)
+        city.historical_center_district = DistrictCenter(
+            id=self.next_district_id,
+            x=0,
+            y=0,
+            ring=0,  # 0 indicates historical center
+            angle=0,
+            district_type='mixed'
+        )
+        self.next_district_id += 1
+        city.district_centers.append(city.historical_center_district)
+
+        # Generate district centers for each ring with types
         for ring in city.rings:
             centers = self._generate_district_centers_for_ring(ring)
             ring.district_centers = centers
@@ -192,6 +205,19 @@ class LayoutGenerator:
         count = int(min_count + t * (max_count - min_count))
         return max(1, count)  # Ensure at least 1 center
 
+    def _select_district_type(self, ring_number: int) -> str:
+        """Select a district type based on ring-specific probabilities"""
+        ring_key = f'ring_{ring_number}'
+
+        if ring_key not in DISTRICT_TYPE_DISTRIBUTION:
+            return 'mixed'  # Default
+
+        probabilities = DISTRICT_TYPE_DISTRIBUTION[ring_key]
+        types = list(probabilities.keys())
+        weights = list(probabilities.values())
+
+        return random.choices(types, weights=weights)[0]
+
     def _generate_district_centers_for_ring(self, ring: Ring) -> List[DistrictCenter]:
         """Generate district centers for a specific ring using angular sectors"""
         num_centers = self._interpolate_district_count(ring.ring_number)
@@ -229,11 +255,17 @@ class LayoutGenerator:
             x = radius * math.cos(angle)
             y = radius * math.sin(angle)
 
+            # Select district type based on ring
+            district_type = self._select_district_type(ring.ring_number)
+
             centers.append(DistrictCenter(
+                id=self.next_district_id,
                 x=x,
                 y=y,
                 ring=ring.ring_number,
-                angle=angle
+                angle=angle,
+                district_type=district_type
             ))
+            self.next_district_id += 1
 
         return centers
