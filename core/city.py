@@ -1,6 +1,6 @@
 """
 City module - defines the city structure
-Updated to include buildings as graph nodes and district types
+Updated to include buildings as graph nodes, district types, and grid areas
 """
 
 from dataclasses import dataclass, field
@@ -63,6 +63,41 @@ class Ring:
 
 
 @dataclass
+class GridArea:
+    """Represents a local grid area with its own orientation and spacing"""
+    id: int
+    center_x: float
+    center_y: float
+    rotation: float  # Grid rotation in radians
+    spacing: float  # Grid spacing in km
+    zone: str  # Which zone this grid belongs to
+
+    def snap_to_grid(self, x: float, y: float) -> Tuple[float, float]:
+        """Snap a position to the nearest grid point"""
+        # Translate to grid origin
+        dx = x - self.center_x
+        dy = y - self.center_y
+
+        # Rotate to align with grid
+        cos_r = math.cos(-self.rotation)
+        sin_r = math.sin(-self.rotation)
+        grid_x = dx * cos_r - dy * sin_r
+        grid_y = dx * sin_r + dy * cos_r
+
+        # Snap to nearest grid point
+        snapped_x = round(grid_x / self.spacing) * self.spacing
+        snapped_y = round(grid_y / self.spacing) * self.spacing
+
+        # Rotate back
+        cos_r = math.cos(self.rotation)
+        sin_r = math.sin(self.rotation)
+        final_x = snapped_x * cos_r - snapped_y * sin_r + self.center_x
+        final_y = snapped_x * sin_r + snapped_y * cos_r + self.center_y
+
+        return final_x, final_y
+
+
+@dataclass
 class City:
     """Represents the city with its layout structure and buildings"""
     radius: float  # City radius in km
@@ -75,6 +110,7 @@ class City:
     district_centers: List[DistrictCenter] = field(default_factory=list)
     buildings: List[Building] = field(default_factory=list)
     building_graph: nx.Graph = field(default_factory=nx.Graph)
+    grid_areas: List[GridArea] = field(default_factory=list)  # Local grid areas for ordered placement
 
     def __post_init__(self):
         """Validate city data"""
@@ -92,6 +128,10 @@ class City:
             zone=building.zone,
             primary_district=building.primary_district
         )
+
+    def set_grid_areas(self, grid_areas: List[GridArea]):
+        """Set the grid areas for the city"""
+        self.grid_areas = grid_areas
 
     def get_zone_at_position(self, x: float, y: float) -> str:
         """Determine which zone a position belongs to"""
@@ -176,6 +216,7 @@ class City:
             'num_buildings': len(self.buildings),
             'building_stats': building_stats,
             'district_stats': district_stats,
+            'num_grid_areas': len(self.grid_areas),
             'rings': [
                 {
                     'ring_number': ring.ring_number,
